@@ -20,7 +20,9 @@ def get_pdf_text(pdf_docs):
     for pdf in pdf_docs:
         pdf_reader = PdfReader(pdf)
         for page in pdf_reader.pages:
-            text += page.extract_text()
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted
     return text
 
 # --- 텍스트를 벡터 DB에 저장 함수 ---
@@ -50,12 +52,21 @@ with st.sidebar:
     st.header("문서 업로드 (DB 저장)")
     pdf_docs = st.file_uploader("관련 인허가 서류(PDF)를 업로드하세요.", accept_multiple_files=True)
     if st.button("문서 처리 및 DB 저장"):
-        with st.spinner("문서를 분석하고 데이터베이스에 저장 중입니다..."):
-            raw_text = get_pdf_text(pdf_docs)
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            text_chunks = text_splitter.split_text(raw_text)
-            get_vector_store(text_chunks)
-            st.success("데이터베이스 저장이 완료되었습니다!")
+        if not pdf_docs:
+            st.warning("⚠️ 파일을 먼저 업로드해주세요!")
+        else:
+            with st.spinner("문서를 분석하고 데이터베이스에 저장 중입니다..."):
+                raw_text = get_pdf_text(pdf_docs)
+                if not raw_text.strip():
+                    st.error("🚨 에러: PDF에서 텍스트를 읽을 수 없습니다. (스캔된 이미지 파일이거나 글꼴이 깨진 파일일 수 있습니다.) 다른 텍스트 위주의 PDF로 시도해 주세요.")
+                else:
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                    text_chunks = text_splitter.split_text(raw_text)
+                    if not text_chunks:
+                        st.error("🚨 에러: 텍스트를 분할하는 데 실패했습니다.")
+                    else:
+                        get_vector_store(text_chunks)
+                        st.success("데이터베이스 저장이 완료되었습니다!")
 
 # --- 메인 화면: 챗봇 UI ---
 user_question = st.text_input("업로드된 문서에 대해 질문해 주세요 (예: API 625에서 롤오버(Rollover)를 어떻게 방지하라고 되어 있나요?)")
