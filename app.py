@@ -1,5 +1,5 @@
 import streamlit as st
-from PyPDF2 import PdfReader
+import pdfplumber
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
@@ -14,15 +14,15 @@ os.environ["GOOGLE_API_KEY"] = "AIzaSyDDEvdAhaC6YAEYVaO3VstozAZdCdd1lHc"
 st.set_page_config(page_title="인허가 문서 AI 챗봇", layout="wide")
 st.title("LPG 터미널 인허가 & 규격 검토 챗봇 🤖")
 
-# --- PDF 텍스트 추출 함수 ---
+# --- 강력한 PDF 텍스트 추출 함수 (pdfplumber 사용) ---
 def get_pdf_text(pdf_docs):
     text = ""
     for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted
+        with pdfplumber.open(pdf) as pdf_reader:
+            for page in pdf_reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
     return text
 
 # --- 텍스트를 벡터 DB에 저장 함수 ---
@@ -55,7 +55,7 @@ with st.sidebar:
         if not pdf_docs:
             st.warning("⚠️ 파일을 먼저 업로드해주세요!")
         else:
-            with st.spinner("문서를 분석하고 데이터베이스에 저장 중입니다..."):
+            with st.spinner("문서를 분석하고 데이터베이스에 저장 중입니다... (문서가 클 경우 1~2분 소요될 수 있습니다)"):
                 try:
                     raw_text = get_pdf_text(pdf_docs)
                     if not raw_text.strip():
@@ -70,7 +70,7 @@ with st.sidebar:
                             st.success("데이터베이스 저장이 완료되었습니다!")
                 except Exception as e:
                     # 구글 API 통신 에러가 나면 무한 로딩 대신 화면에 에러를 즉시 출력합니다.
-                    st.error(f"🚨 구글 API 통신 에러가 발생했습니다:\n\n{e}")
+                    st.error(f"🚨 에러가 발생했습니다:\n\n{e}")
 
 # --- 메인 화면: 챗봇 UI ---
 user_question = st.text_input("업로드된 문서에 대해 질문해 주세요 (예: API 625에서 롤오버(Rollover)를 어떻게 방지하라고 되어 있나요?)")
