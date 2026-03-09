@@ -56,34 +56,10 @@ with st.sidebar:
             st.warning("⚠️ 파일을 먼저 업로드해주세요!")
         else:
             with st.spinner("문서를 분석하고 데이터베이스에 저장 중입니다..."):
-                raw_text = get_pdf_text(pdf_docs)
-                if not raw_text.strip():
-                    st.error("🚨 에러: PDF에서 텍스트를 읽을 수 없습니다. (스캔된 이미지 파일이거나 글꼴이 깨진 파일일 수 있습니다.) 다른 텍스트 위주의 PDF로 시도해 주세요.")
-                else:
-                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-                    text_chunks = text_splitter.split_text(raw_text)
-                    if not text_chunks:
-                        st.error("🚨 에러: 텍스트를 분할하는 데 실패했습니다.")
+                try:
+                    raw_text = get_pdf_text(pdf_docs)
+                    if not raw_text.strip():
+                        st.error("🚨 에러: PDF에서 텍스트를 읽을 수 없습니다.")
                     else:
-                        get_vector_store(text_chunks)
-                        st.success("데이터베이스 저장이 완료되었습니다!")
-
-# --- 메인 화면: 챗봇 UI ---
-user_question = st.text_input("업로드된 문서에 대해 질문해 주세요 (예: API 625에서 롤오버(Rollover)를 어떻게 방지하라고 되어 있나요?)")
-
-if user_question:
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    try:
-        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-        docs = new_db.similarity_search(user_question)
-        
-        # 최신 방식에 맞게 검색된 문서를 텍스트로 결합
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        chain = get_conversational_chain()
-        response = chain.invoke({"context": context, "question": user_question})
-        
-        st.write("### 💡 AI 답변:")
-        st.info(response)
-    except Exception as e:
-        st.warning("먼저 좌측 사이드바에서 문서를 업로드하고 DB 저장 버튼을 눌러주세요.")
+                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                        text_chunks = text_splitter.split_text(raw_text)
