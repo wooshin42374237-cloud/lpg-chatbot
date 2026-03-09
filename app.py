@@ -27,7 +27,8 @@ def get_pdf_text(pdf_docs):
 
 # --- 텍스트를 벡터 DB에 저장 함수 ---
 def get_vector_store(text_chunks):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    # 💡 수정된 부분: 최신 구글 임베딩 모델 적용
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index") # 로컬 폴더에 DB 저장
 
@@ -69,7 +70,6 @@ with st.sidebar:
                             get_vector_store(text_chunks)
                             st.success("데이터베이스 저장이 완료되었습니다!")
                 except Exception as e:
-                    # 구글 API 통신 에러가 나면 무한 로딩 대신 화면에 에러를 즉시 출력합니다.
                     st.error(f"🚨 에러가 발생했습니다:\n\n{e}")
 
 # --- 메인 화면: 챗봇 UI ---
@@ -77,11 +77,11 @@ user_question = st.text_input("업로드된 문서에 대해 질문해 주세요
 
 if user_question:
     try:
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        # 💡 수정된 부분: 최신 구글 임베딩 모델 적용
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
         new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
         docs = new_db.similarity_search(user_question)
         
-        # 최신 방식에 맞게 검색된 문서를 텍스트로 결합
         context = "\n\n".join([doc.page_content for doc in docs])
         
         chain = get_conversational_chain()
