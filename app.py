@@ -1,13 +1,14 @@
 import streamlit as st
 from PyPDF2 import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter  # <-- 수정된 부분 1
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.vectorstores import FAISS  # <-- 수정된 부분 2
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 import os
 
 # --- 설정 (Gemini API Key 입력 필요) ---
+# 🚨 주의: 이곳에 새로 발급받은 구글 API 키를 넣어주세요!
 os.environ["GOOGLE_API_KEY"] = "AIzaSyDDEvdAhaC6YAEYVaO3VstozAZdCdd1lHc"
 
 st.set_page_config(page_title="인허가 문서 AI 챗봇", layout="wide")
@@ -28,7 +29,7 @@ def get_vector_store(text_chunks):
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index") # 로컬 폴더에 DB 저장
 
-# --- 챗봇 응답 생성 함수 ---
+# --- 최신 방식(LCEL) 챗봇 응답 생성 함수 ---
 def get_conversational_chain():
     prompt_template = """
     주어진 문맥(Context)을 바탕으로 질문에 최대한 자세히 답변해 주세요.
@@ -40,8 +41,8 @@ def get_conversational_chain():
     Answer:
     """
     model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    prompt = PromptTemplate.from_template(prompt_template)
+    chain = prompt | model | StrOutputParser()
     return chain
 
 # --- 사이드바: 파일 업로드 영역 ---
@@ -64,10 +65,14 @@ if user_question:
     try:
         new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
         docs = new_db.similarity_search(user_question)
+        
+        # 최신 방식에 맞게 검색된 문서를 텍스트로 결합
+        context = "\n\n".join([doc.page_content for doc in docs])
+        
         chain = get_conversational_chain()
-        response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
+        response = chain.invoke({"context": context, "question": user_question})
         
         st.write("### 💡 AI 답변:")
-        st.info(response["output_text"])
-    except:
+        st.info(response)
+    except Exception as e:
         st.warning("먼저 좌측 사이드바에서 문서를 업로드하고 DB 저장 버튼을 눌러주세요.")
